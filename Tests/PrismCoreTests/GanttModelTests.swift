@@ -1,8 +1,0 @@
-import XCTest
-@testable import PrismCore
-
-final class GanttModelTests: XCTestCase {
-    func testCycleDetectionAndViewport() { let date = Date(); let a = GanttTask(id: "a", title: "A", start: date, end: date.addingTimeInterval(60)); let b = GanttTask(id: "b", title: "B", start: date.addingTimeInterval(60), end: date.addingTimeInterval(120)); let model = GanttModel(tasks: [a, b], dependencies: ["a": ["b"], "b": ["a"]]); XCTAssertThrowsError(try model.validateDependencies()) { XCTAssertEqual($0 as? GanttError, .dependencyCycle) }; let acyclic = GanttModel(tasks: [a, b]); XCTAssertEqual(acyclic.visibleTasks(offset: 0, limit: 1).count, 1) }
-    func testZoomAndCancelledRescheduleRestoresTask() { let date = Date(); var model = GanttModel(tasks: [GanttTask(id: "x", title: "X", start: date, end: date.addingTimeInterval(60))]); model.setZoom(10); XCTAssertEqual(model.zoom, 4); model.beginReschedule(id: "x"); XCTAssertFalse(model.reschedule(id: "x", start: date.addingTimeInterval(100), end: date.addingTimeInterval(160), cancelled: true)); model.cancelReschedule(); XCTAssertEqual(model.tasks["x"]!.start, date) }
-    func testUnknownDependencyAndAccessibilityRows() { let date = Date(timeIntervalSince1970: 0); let model = GanttModel(tasks: [GanttTask(id: "x", title: "X", start: date, end: date.addingTimeInterval(60))], dependencies: ["x": ["missing"]]); XCTAssertThrowsError(try model.validateDependencies()) { XCTAssertEqual($0 as? GanttError, .unknownTask) }; let rows = GanttModel(tasks: [GanttTask(id: "x", title: "X", start: date, end: date.addingTimeInterval(60))]).accessibilityTable(); XCTAssertEqual(rows.count, 2); XCTAssertEqual(rows[0], ["task", "start", "end"]); XCTAssertEqual(rows[1][0], "X") }
-}

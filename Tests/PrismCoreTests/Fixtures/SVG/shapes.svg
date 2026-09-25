@@ -1,9 +1,0 @@
-<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-  <g fill="#00FF00" opacity="0.8">
-    <rect x="10" y="10" width="30" height="30" rx="5" ry="5" fill="#FF0000" stroke="#000000" stroke-width="2"/>
-    <circle cx="70" cy="25" r="15" fill="#0000FF"/>
-    <ellipse cx="30" cy="70" rx="20" ry="10"/>
-    <line x1="60" y1="60" x2="90" y2="90" stroke="#FF00FF" stroke-width="3"/>
-    <polyline points="60,90 75,70 90,80" stroke="#00FFFF" stroke-width="1.5" fill="none"/>
-  </g>
-</svg>
