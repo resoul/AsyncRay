@@ -63,7 +63,7 @@ Add AsyncRay to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/resoul/asyncray.git", from: "1.0.0")
+    .package(url: "https://github.com/resoul/AsyncRay.git", from: "1.0.0")
 ]
 ```
 
@@ -73,12 +73,12 @@ Then add `AsyncRay` to your target's dependencies:
 .target(
     name: "YourApp",
     dependencies: [
-        .product(name: "AsyncRay", package: "asyncray")
+        .product(name: "AsyncRay", package: "AsyncRay")
     ]
 )
 ```
 
-Or add via Xcode: **File** → **Add Package Dependencies...** and enter `https://github.com/resoul/asyncray.git`.
+Or add via Xcode: **File** → **Add Package Dependencies...** and enter `https://github.com/resoul/AsyncRay.git`.
 
 ### Bazel
 
