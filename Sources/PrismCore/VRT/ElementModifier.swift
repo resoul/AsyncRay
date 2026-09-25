@@ -11,6 +11,8 @@ public enum ElementModifier: Equatable, Sendable, CustomStringConvertible {
     case padding(DirectionalEdgeInsets)
     case margin(DirectionalEdgeInsets)
     case background(Color)
+    /// Foreground color is kept separate from background so later surface fills cannot hide text.
+    case foreground(Color)
     case opacity(Double)
     case zIndex(Int)
     case explicitKey(String)
@@ -34,6 +36,7 @@ public enum ElementModifier: Equatable, Sendable, CustomStringConvertible {
         case .margin(let insets):
             return "margin(t: \(insets.top), l: \(insets.leading), b: \(insets.bottom), tr: \(insets.trailing))"
         case .background(let color): return "background(\(color))"
+        case .foreground(let color): return "foreground(\(color))"
         case .opacity(let o): return "opacity(\(o))"
         case .zIndex(let z): return "zIndex(\(z))"
         case .explicitKey(let k): return "key(\"\(k)\")"
@@ -90,6 +93,7 @@ public struct ResolvedStyle: Equatable, Sendable, CustomStringConvertible {
     public var padding: DirectionalEdgeInsets
     public var margin: DirectionalEdgeInsets
     public var background: Color?
+    public var foreground: Color?
     public var opacity: Double
     public var zIndex: Int
     public var sdfRoundedRect: SDFRoundedRectStyle?
@@ -106,6 +110,7 @@ public struct ResolvedStyle: Equatable, Sendable, CustomStringConvertible {
         padding: DirectionalEdgeInsets = .zero,
         margin: DirectionalEdgeInsets = .zero,
         background: Color? = nil,
+        foreground: Color? = nil,
         opacity: Double = 1.0,
         zIndex: Int = 0,
         sdfRoundedRect: SDFRoundedRectStyle? = nil,
@@ -121,6 +126,7 @@ public struct ResolvedStyle: Equatable, Sendable, CustomStringConvertible {
         self.padding = padding
         self.margin = margin
         self.background = background
+        self.foreground = foreground
         self.opacity = opacity
         self.zIndex = zIndex
         self.sdfRoundedRect = sdfRoundedRect
@@ -169,6 +175,8 @@ public struct ResolvedStyle: Equatable, Sendable, CustomStringConvertible {
                 )
             case .background(let color):
                 style.background = color
+            case .foreground(let color):
+                style.foreground = color
             case .opacity(let o):
                 style.opacity = max(0.0, min(1.0, style.opacity * o))
             case .zIndex(let z):
@@ -194,6 +202,7 @@ public struct ResolvedStyle: Equatable, Sendable, CustomStringConvertible {
         if padding != .zero { parts.append("padding: \(padding)") }
         if margin != .zero { parts.append("margin: \(margin)") }
         if let background { parts.append("background: \(background)") }
+        if let foreground { parts.append("foreground: \(foreground)") }
         if opacity < 1.0 { parts.append("opacity: \(opacity)") }
         if zIndex != 0 { parts.append("zIndex: \(zIndex)") }
         if let sdf = sdfRoundedRect { parts.append("sdfRoundedRect(r: \(sdf.cornerRadius))") }

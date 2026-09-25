@@ -22,6 +22,12 @@ public final class HostNSView: NSView, PrismHost {
         set { engine.theme = newValue }
     }
 
+    /// Controls whether the mounted tree consumes all, some, or none of AppKit safe-area insets.
+    public var safeAreaPolicy: SafeAreaPolicy {
+        get { engine.safeAreaPolicy }
+        set { engine.safeAreaPolicy = newValue }
+    }
+
     public convenience init(element: RenderElement) {
         self.init(element: element, theme: nil)
     }

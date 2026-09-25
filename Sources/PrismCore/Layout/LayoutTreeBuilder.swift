@@ -70,7 +70,14 @@ public enum LayoutTreeBuilder {
     private static func resolveMeasurePolicy(from element: RenderElement) -> MeasurePolicy? {
         switch element.kind {
         case .text(let text):
-            let fontSize: Double = element.props.custom["fontRole"] == "heading" ? 22 : 16
+            // Measurement must use the same semantic font sizes as TextRenderer;
+            // otherwise larger roles (for example `display`) overlap adjacent rows.
+            let fontSize: Double
+            switch element.props.custom["fontRole"] {
+            case "heading": fontSize = 22
+            case "display": fontSize = 28
+            default: fontSize = 16
+            }
             let lineLimit = element.props.custom["lineLimit"].flatMap { Int($0) }
             return TextMeasurePolicy(text: text, fontSize: fontSize, lineLimit: lineLimit)
 

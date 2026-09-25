@@ -141,6 +141,11 @@ extension Component {
         render().background(color)
     }
 
+    /// Applies text/content color without affecting the element's surface background.
+    public func foregroundColor(_ color: Color) -> RenderElement {
+        render().foregroundColor(color)
+    }
+
     public func opacity(_ value: Double) -> RenderElement {
         render().opacity(value)
     }

@@ -187,6 +187,12 @@ extension RenderElement {
         return copy
     }
 
+    public func foregroundColor(_ color: Color) -> RenderElement {
+        var copy = self
+        copy.modifiers.append(.foreground(color))
+        return copy
+    }
+
     public func opacity(_ value: Double) -> RenderElement {
         var copy = self
         copy.modifiers.append(.opacity(value))

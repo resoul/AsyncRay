@@ -35,6 +35,11 @@ public final class PrismHostEngine {
         }
     }
 
+    /// Selectively applies platform safe-area edges while retaining the raw insets for diagnostics.
+    public var safeAreaPolicy: SafeAreaPolicy = .all {
+        didSet { if oldValue != safeAreaPolicy { render() } }
+    }
+
     public var bounds: CGRect = .zero {
         didSet {
             if oldValue != bounds {
@@ -101,8 +106,9 @@ public final class PrismHostEngine {
         let layoutNode = LayoutTreeBuilder.build(from: normalized)
         self.rootLayoutNode = layoutNode
 
-        let contentWidth = max(0, bounds.width - safeAreaInsets.leading - safeAreaInsets.trailing)
-        let contentHeight = max(0, bounds.height - safeAreaInsets.top - safeAreaInsets.bottom)
+        let effectiveInsets = safeAreaInsets.applying(safeAreaPolicy)
+        let contentWidth = max(0, bounds.width - effectiveInsets.leading - effectiveInsets.trailing)
+        let contentHeight = max(0, bounds.height - effectiveInsets.top - effectiveInsets.bottom)
 
         let constraint = SizeConstraint(
             width: .exactly(contentWidth),
@@ -111,8 +117,8 @@ public final class PrismHostEngine {
         layoutNode.measure(constraint: constraint)
 
         let rootFrame = LayoutFrame(
-            x: safeAreaInsets.leading,
-            y: safeAreaInsets.top,
+            x: effectiveInsets.leading,
+            y: effectiveInsets.top,
             width: contentWidth,
             height: contentHeight
         )

@@ -2,13 +2,6 @@ import Foundation
 @_exported import PrismCore
 
 /// Policy for safe-area insetting applied to Scaffold content.
-public enum SafeAreaPolicy: Sendable, Equatable {
-    case all
-    case topOnly
-    case bottomOnly
-    case none
-}
-
 /// Automatic scrolling behavior for primary Scaffold content.
 public enum AutoScrollPolicy: Sendable, Equatable {
     case automatic

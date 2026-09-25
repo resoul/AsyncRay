@@ -53,10 +53,11 @@ public final class TextRenderer: LayerRenderer {
             }
 
             let style = element.resolvedStyle
-            let textColor = style.background ?? Color.black
+            // Foreground and surface are independent; a card/background must not recolor its text.
+            let textColor = style.foreground ?? Color.black
 
             let ctFont: CTFont
-            let fontSize: CGFloat = fontRoleDesc == "heading" ? 22 : 16
+            let fontSize: CGFloat = fontRoleDesc == "heading" ? 22 : (fontRoleDesc == "display" ? 28 : 16)
             ctFont = CTFontCreateUIFontForLanguage(.system, fontSize, nil)
                 ?? CTFontCreateWithName("Helvetica" as CFString, fontSize, nil)
 

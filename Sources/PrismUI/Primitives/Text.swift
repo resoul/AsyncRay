@@ -50,7 +50,7 @@ public struct Text: Component {
 
         var modifiers: [ElementModifier] = []
         if let textColor {
-            modifiers.append(.background(textColor)) // or foreground text styling
+            modifiers.append(.foreground(textColor))
         }
 
         return RenderElement(

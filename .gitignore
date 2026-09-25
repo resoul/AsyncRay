@@ -17,6 +17,12 @@ DerivedData/
 # The runnable showcase project is source, while Xcode's local build directory is not.
 !Examples/PrismShowcase/PrismShowcase.xcodeproj/
 !Examples/PrismShowcase/PrismShowcase.xcodeproj/**
+!Examples/PrismManualTesting/iOS/iOS.xcodeproj/
+!Examples/PrismManualTesting/iOS/iOS.xcodeproj/**
+!Examples/PrismManualTesting/macOS/macOS.xcodeproj/
+!Examples/PrismManualTesting/macOS/macOS.xcodeproj/**
+!Examples/PrismManualTesting/PrismManualTesting.xcworkspace/
+!Examples/PrismManualTesting/PrismManualTesting.xcworkspace/**
 Examples/PrismShowcase/PrismShowcase.xcodeproj/xcuserdata/
 Examples/PrismShowcase/PrismShowcase.xcodeproj/project.xcworkspace/xcuserdata/
 Examples/PrismShowcase/build/
