@@ -145,8 +145,12 @@ struct FoundationRegressionTests {
         let values = Collector<Int>()
         let completed = Collector<Bool>()
         let subscription = blockedSink(
-            values: values, completed: completed, entered: entered.continuation,
-            ended: ended.continuation, resume: resume, withCompletion: withCompletion
+            values: values,
+            completed: completed,
+            entered: entered.continuation,
+            ended: ended.continuation,
+            resume: resume,
+            withCompletion: withCompletion
         )
         var arrivals = entered.stream.makeAsyncIterator()
         #expect(await arrivals.next() != nil)
@@ -159,9 +163,12 @@ struct FoundationRegressionTests {
     }
 
     private func blockedSink(
-        values: Collector<Int>, completed: Collector<Bool>,
-        entered: AsyncStream<Void>.Continuation, ended: AsyncStream<Void>.Continuation,
-        resume: DispatchSemaphore, withCompletion: Bool
+        values: Collector<Int>,
+        completed: Collector<Bool>,
+        entered: AsyncStream<Void>.Continuation,
+        ended: AsyncStream<Void>.Continuation,
+        resume: DispatchSemaphore,
+        withCompletion: Bool
     ) -> Subscription {
         let lifetime = DeliveryLifetime(ended)
         let handler: @Sendable (Int) -> Void = { [lifetime] value in
@@ -173,7 +180,10 @@ struct FoundationRegressionTests {
             withExtendedLifetime(lifetime) {}
         }
         if withCompletion {
-            return AsyncRay.from([1, 2, 3]).sink(next: handler, completed: { completed.append(true) })
+            return AsyncRay.from([1, 2, 3]).sink(
+                next: handler,
+                completed: { completed.append(true) }
+            )
         }
         return AsyncRay.from([1, 2, 3]).sink(handler)
     }
@@ -226,7 +236,8 @@ struct FoundationRegressionTests {
         outer.continuation.yield(2)
         #expect(await registrations.next() == 2)
         for await _ in oldEnded.stream {}
-        if case .terminated = old.continuation.yield(10) {} else {
+        if case .terminated = old.continuation.yield(10) {
+        } else {
             Issue.record("Cancelled source accepted a late response")
         }
         fresh.continuation.yield(20)

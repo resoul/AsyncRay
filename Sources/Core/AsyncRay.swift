@@ -1,5 +1,3 @@
-// Core reactive cold stream backed by AsyncStream
-
 import Foundation
 
 /// A cold reactive stream of values of type `T`.
@@ -64,6 +62,9 @@ public struct AsyncRay<T: Sendable>: Sendable {
 
     /// Creates a new root stream from an `AsyncStream` factory.
     ///
+    /// The factory runs once for each subscription, including each access to `stream`.
+    /// The returned stream controls its own buffering and termination behavior.
+    ///
     /// - Warning: This initializer creates a fresh source and intentionally resets any inherited buffering policy.
     ///   Custom downstream operators must use `chained` or internal initializers with explicit/inherited policy.
     public init(_ make: @Sendable @escaping () -> AsyncStream<T>) {
@@ -91,6 +92,10 @@ public struct AsyncRay<T: Sendable>: Sendable {
     ///
     /// The `build` closure is executed synchronously upon each subscription.
     /// Use asynchronous `Task {}` blocks inside if needed.
+    /// Values use the default unbounded `AsyncStream` buffer. Producers that can outpace
+    /// their consumers should use the factory initializer with a bounded stream or otherwise
+    /// control their production rate. Register cleanup with the emitter for work that must
+    /// stop when the subscription is cancelled.
     public init(_ build: @Sendable @escaping (AsyncRayEmitter<T>) -> Void) {
         self._make = {
             AsyncStream<T> { continuation in
@@ -126,6 +131,10 @@ public struct AsyncRay<T: Sendable>: Sendable {
     }
 
     /// A stream that emits all elements from a sequence and then completes.
+    ///
+    /// The sequence is traversed synchronously when each subscription is created. The source
+    /// uses the default unbounded `AsyncStream` buffer, so a large sequence can be buffered
+    /// before a slower consumer catches up.
     public static func from(_ values: some Sequence<T> & Sendable) -> AsyncRay<T> {
         AsyncRay { emitter in
             for value in values { emitter.send(value) }
@@ -172,7 +181,10 @@ public struct AsyncRay<T: Sendable>: Sendable {
     ///
     /// Returns a `Subscription` handle. Store it in a `SubscriptionBag` for automatic lifecycle management.
     ///
-    /// - Parameter handler: Invoked for each emitted value.
+    /// - Parameter handler: Invoked for each delivered value on the subscription task. No
+    ///   specific actor is guaranteed; use `sinkOnMain(_:)` for `MainActor` delivery.
+    /// - Important: Cancellation stops future delivery after it is observed. A callback
+    ///   already running may finish.
     @discardableResult
     public func sink(
         _ handler: @Sendable @escaping (T) -> Void
@@ -193,6 +205,10 @@ public struct AsyncRay<T: Sendable>: Sendable {
     }
 
     /// Subscribes with an explicit completion callback.
+    ///
+    /// `completed` runs only after normal stream completion, not when the subscription is
+    /// cancelled. Both callbacks run on the subscription task; use `sinkOnMain(_:)` when
+    /// values must be handled on `MainActor`.
     @discardableResult
     public func sink(
         next: @Sendable @escaping (T) -> Void,
@@ -217,6 +233,7 @@ public struct AsyncRay<T: Sendable>: Sendable {
     /// Subscribes directly on `MainActor`.
     ///
     /// Recommended for UI bindings without extra intermediate thread dispatching.
+    /// The handler runs on `MainActor`; cancellation does not interrupt a callback already running.
     @discardableResult @MainActor
     public func sinkOnMain(
         _ handler: @MainActor @escaping (T) -> Void
@@ -246,6 +263,9 @@ public struct AsyncRay<T: Sendable>: Sendable {
     }
 
     /// Awaits and returns the first emitted value (or `nil` if the stream completed empty).
+    ///
+    /// The iteration stops as soon as the first value is received. Producer cleanup follows
+    /// the termination behavior of the `AsyncStream` returned by this source.
     public func first() async -> T? {
         for await value in _make() {
             return value
@@ -256,6 +276,8 @@ public struct AsyncRay<T: Sendable>: Sendable {
     /// Collects all values of a finite stream into an array.
     ///
     /// - Warning: Do not call on infinite streams.
+    /// - Important: This stores every received value in memory. The result is complete only
+    ///   when the stream completes normally.
     public func collect() async -> [T] {
         var result: [T] = []
         for await value in _make() {
@@ -322,7 +344,9 @@ internal func makeAsyncRayStream<Element: Sendable>(
     _ build: @escaping (AsyncStream<Element>.Continuation) -> Void
 ) -> AsyncStream<Element> {
     if let policy {
-        return AsyncStream<Element>(bufferingPolicy: policy.streamPolicy()) { continuation in build(continuation) }
+        return AsyncStream<Element>(bufferingPolicy: policy.streamPolicy()) { continuation in
+            build(continuation)
+        }
     }
     return AsyncStream<Element> { continuation in build(continuation) }
 }

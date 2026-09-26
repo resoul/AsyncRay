@@ -5,15 +5,25 @@ import Testing
 func test_zip_rightCompletesWithoutValue_cancelsPendingLeft() async {
     let left = AsyncStream<Int>.makeStream(bufferingPolicy: .bufferingNewest(1))
     let cancelled = AsyncStream<Bool>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    left.continuation.onTermination = { _ in cancelled.continuation.yield(true); cancelled.continuation.finish() }
-    let values = await zip(AsyncRay { left.stream }, AsyncRay<String>.empty(), bufferingPolicy: .bufferingNewest(1)).collect()
+    left.continuation.onTermination = { _ in
+        cancelled.continuation.yield(true); cancelled.continuation.finish()
+    }
+    let values = await zip(
+        AsyncRay { left.stream },
+        AsyncRay<String>.empty(),
+        bufferingPolicy: .bufferingNewest(1)
+    ).collect()
     #expect(values.isEmpty)
     #expect(await AsyncRay { cancelled.stream }.first() == true)
 }
 
 @Test(.timeLimit(.minutes(1)))
 func test_zip_asymmetricFiniteStreams_preservesPairs() async {
-    let values = await zip(AsyncRay.from(Array(0..<128)), AsyncRay.from(Array(1000..<1040)), bufferingPolicy: .bufferingNewest(128)).collect()
+    let values = await zip(
+        AsyncRay.from(Array(0..<128)),
+        AsyncRay.from(Array(1000..<1040)),
+        bufferingPolicy: .bufferingNewest(128)
+    ).collect()
     #expect(values.map(\.0) == Array(0..<40))
     #expect(values.map(\.1) == Array(1000..<1040))
 }
@@ -24,11 +34,19 @@ func test_zip_cancelWhileOneSideWaits_releasesBothSources() async {
     let right = AsyncStream<String>.makeStream(bufferingPolicy: .bufferingNewest(1))
     let leftCancelled = AsyncStream<Bool>.makeStream(bufferingPolicy: .bufferingNewest(1))
     let rightCancelled = AsyncStream<Bool>.makeStream(bufferingPolicy: .bufferingNewest(1))
-    left.continuation.onTermination = { _ in leftCancelled.continuation.yield(true); leftCancelled.continuation.finish() }
-    right.continuation.onTermination = { _ in rightCancelled.continuation.yield(true); rightCancelled.continuation.finish() }
+    left.continuation.onTermination = { _ in
+        leftCancelled.continuation.yield(true); leftCancelled.continuation.finish()
+    }
+    right.continuation.onTermination = { _ in
+        rightCancelled.continuation.yield(true); rightCancelled.continuation.finish()
+    }
     left.continuation.yield(1)
     // Direct stream wrappers avoid the unrelated asynchronous shared-bridge registration path.
-    let stream = zip(AsyncRay { left.stream }, AsyncRay { right.stream }, bufferingPolicy: .bufferingNewest(1)).stream
+    let stream = zip(
+        AsyncRay { left.stream },
+        AsyncRay { right.stream },
+        bufferingPolicy: .bufferingNewest(1)
+    ).stream
     let consumer = Task { for await _ in stream {} }
     consumer.cancel()
     await consumer.value

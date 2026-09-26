@@ -1,5 +1,3 @@
-// Thread-safe wrapper around AsyncStream.Continuation
-
 /// Interface for sending values and managing lifecycle from a custom generator.
 ///
 /// Used inside `AsyncRay.init(_ build:)`:

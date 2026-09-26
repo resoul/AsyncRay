@@ -29,10 +29,10 @@ import Foundation
     let sub = AsyncRay<Int>.never().sink { v in
         received.append(v)
     }
-    
+
     try? await Task.sleep(for: .milliseconds(30))
     sub.cancel()
-    
+
     let values = received.values
     #expect(values.isEmpty)
 }
@@ -43,7 +43,7 @@ import Foundation
     let start = ContinuousClock.now
     let values = await AsyncRay<Int>.timer(.milliseconds(40)).collect()
     let elapsed = start.duration(to: .now)
-    
+
     #expect(values.isEmpty)
     #expect(elapsed >= .milliseconds(30))
 }
@@ -175,7 +175,7 @@ import Foundation
 @Test func throwingStreamConvertsAndCancels() async {
     let asyncRay = AsyncRay.from([1, 2, 3])
     var collected: [Int] = []
-    
+
     do {
         for try await value in asyncRay.throwingStream {
             collected.append(value)
@@ -196,13 +196,13 @@ import Foundation
         }
         return results
     }
-    
+
     try? await Task.sleep(for: .milliseconds(10))
     pipe.send(1)
     try? await Task.sleep(for: .milliseconds(10))
     task.cancel()
     pipe.send(2)
-    
+
     let res = (try? await task.value) ?? []
     #expect(res == [1])
 }
@@ -218,7 +218,7 @@ import Foundation
             continuation.finish()
         }
     }
-    
+
     let mapped = asyncRay.map { $0 * 2 }
     let values = await mapped.collect()
     #expect(values == [2, 4])
@@ -265,17 +265,17 @@ import Foundation
 @Test func sinkWithCompletionCancellation() async {
     let completedFired = Collector<Bool>()
     let pipe = Pipe<Int>()
-    
+
     let sub = pipe.asyncRay.sink(
         next: { _ in },
         completed: { completedFired.append(true) }
     )
-    
+
     try? await Task.sleep(for: .milliseconds(10))
     sub.cancel()
     pipe.finish()
     try? await Task.sleep(for: .milliseconds(20))
-    
+
     let fired = completedFired.values
     #expect(fired.isEmpty)
 }
@@ -306,18 +306,18 @@ import Foundation
     let received = Collector<Int>()
     let pipe = Pipe<Int>()
     let bag = SubscriptionBag()
-    
+
     pipe.asyncRay.sink { value in
         received.append(value)
     }.store(in: bag)
-    
+
     pipe.send(1)
     try? await Task.sleep(for: .milliseconds(20))
-    
+
     bag.cancelAll()
     pipe.send(2)
     try? await Task.sleep(for: .milliseconds(20))
-    
+
     let all = received.values
     #expect(all == [1])
 }

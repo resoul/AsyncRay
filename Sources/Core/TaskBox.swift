@@ -1,9 +1,7 @@
-// Thread-safe holder for a single active nested task (used by debounce, timeout, flatMapLatest).
-//
+import Foundation
+
 // Ensures explicit cancellation linkage between the outer AsyncStream task and nested tasks,
 // preventing leaked background sleep loops or delivery after subscription cancellation.
-
-import Foundation
 
 internal final class TaskBox<Success: Sendable>: @unchecked Sendable {
 

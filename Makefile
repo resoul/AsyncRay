@@ -10,7 +10,7 @@ test-mac: ## Tests on macOS
 	xcodebuild test -scheme AsyncRay -destination 'platform=macOS'
 
 test-phone: ## Tests on iPhone simulator
-	xcodebuild test -scheme AsyncRay -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+	xcodebuild test -scheme AsyncRay -destination 'platform=iOS Simulator,name=iPhone 18 Pro'
 
 test-tv: ## Tests on Apple TV simulator
 	xcodebuild test -scheme AsyncRay -destination 'platform=tvOS Simulator,name=Apple TV 4K (3rd generation)'
@@ -30,3 +30,13 @@ test-swift6: ## Run all tests in Swift 6 language mode
 
 test-swift5: ## Verify Swift 5 language compatibility using the installed compiler
 	swift test -Xswiftc -swift-version -Xswiftc 5 -Xswiftc -strict-concurrency=complete
+
+SWIFT_FORMAT ?= xcrun swift-format
+SWIFT_PATHS ?= Sources Tests
+
+.PHONY: lint-format format-swift
+lint-format: ## Enforce Swift formatting and policy rules
+	$(SWIFT_FORMAT) lint --strict --configuration .swift-format --recursive $(SWIFT_PATHS)
+
+format-swift: ## Format selected Swift paths; override with SWIFT_PATHS=path/to/File.swift
+	$(SWIFT_FORMAT) format --in-place --configuration .swift-format --recursive $(SWIFT_PATHS)

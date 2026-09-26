@@ -1,5 +1,3 @@
-// Thread-safe container for active subscriptions
-
 import Foundation
 
 /// A subscription container that cancels all retained subscriptions upon `cancelAll()` or `deinit`.
@@ -20,6 +18,7 @@ public final class SubscriptionBag: @unchecked Sendable {
     private let lock = NSLock()
     private var subscriptions: [UUID: Subscription] = [:]
 
+    /// Creates an empty bag for managing subscriptions.
     public init() {}
 
     /// Count of active subscriptions retained in the bag.

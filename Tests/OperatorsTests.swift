@@ -19,20 +19,20 @@ import Testing
 @Test func asyncMapCancellation() async {
     let pipe = Pipe<Int>()
     let results = Collector<String>()
-    
+
     let sub = pipe.asyncRay.asyncMap { val -> String in
         try? await Task.sleep(for: .milliseconds(50))
         return "async-\(val)"
     }.sink { v in
         results.append(v)
     }
-    
+
     try? await Task.sleep(for: .milliseconds(10))
     pipe.send(1)
     try? await Task.sleep(for: .milliseconds(10))
     sub.cancel()
     try? await Task.sleep(for: .milliseconds(100))
-    
+
     let all = results.values
     #expect(all.isEmpty)
 }
@@ -208,9 +208,11 @@ import Testing
     #expect(values == [1, 2, 3, 4])
 }
 
-
 @Test func thenChainsAsyncRayes() async {
-    let values = await AsyncRay.from([1, 2]).then(AsyncRay.from([3, 4]), bufferingPolicy: .unbounded).collect()
+    let values = await AsyncRay.from([1, 2]).then(
+        AsyncRay.from([3, 4]),
+        bufferingPolicy: .unbounded
+    ).collect()
     #expect(values == [1, 2, 3, 4])
 }
 
@@ -397,7 +399,9 @@ import Testing
     #expect(z.inheritedBufferingPolicy == .bufferingNewest(64))
     #expect(z.filter { _ in true }.inheritedBufferingPolicy == .bufferingNewest(64))
 
-    let fm = f1.flatMap(maxConcurrent: 2, bufferingPolicy: .bufferingNewest(12)) { AsyncRay.just($0) }
+    let fm = f1.flatMap(maxConcurrent: 2, bufferingPolicy: .bufferingNewest(12)) {
+        AsyncRay.just($0)
+    }
     #expect(fm.inheritedBufferingPolicy == .bufferingNewest(12))
 
     let fml = f1.flatMapLatest(bufferingPolicy: .bufferingNewest(24)) { AsyncRay.just($0) }
@@ -406,4 +410,3 @@ import Testing
     let t = f1.then(f1, bufferingPolicy: .bufferingNewest(48))
     #expect(t.inheritedBufferingPolicy == .bufferingNewest(48))
 }
-

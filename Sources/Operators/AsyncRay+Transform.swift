@@ -1,5 +1,3 @@
-// Stream transformation operators
-
 extension AsyncRay {
 
     // MARK: - map
@@ -25,6 +23,10 @@ extension AsyncRay {
     }
 
     /// Asynchronously transforms each value.
+    ///
+    /// Values are transformed sequentially: the next upstream value is not read until the
+    /// current transform returns. Use `flatMap(maxConcurrent:bufferingPolicy:_:)` when inner
+    /// work should overlap.
     ///
     /// ```swift
     /// asyncRay.asyncMap { id in await api.fetchUser(id) }
@@ -86,6 +88,8 @@ extension AsyncRay {
     /// - Completion of outer stream waits for all in-flight inner tasks to complete.
     /// - Cancellation of the outer subscription cancels all active inner tasks.
     /// - Reading from upstream pauses while awaiting a free concurrency slot.
+    /// - `bufferingPolicy` applies to the merged output; a bounded policy may drop values
+    ///   when downstream cannot keep up.
     public func flatMap<U: Sendable>(
         maxConcurrent: Int,
         bufferingPolicy: AsyncStream<U>.Continuation.BufferingPolicy,
@@ -121,7 +125,12 @@ extension AsyncRay {
     }
 
     /// Deprecated unbounded `flatMap` retained for source compatibility.
-    @available(*, deprecated, message: "Use flatMap(maxConcurrent:bufferingPolicy:_:) — an unbounded flatMap can grow inner subscriptions and output buffering without limit.")
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use flatMap(maxConcurrent:bufferingPolicy:_:) — an unbounded flatMap can grow inner subscriptions and output buffering without limit."
+    )
     public func flatMap<U: Sendable>(
         _ transform: @Sendable @escaping (T) -> AsyncRay<U>
     ) -> AsyncRay<U> {
@@ -172,7 +181,12 @@ extension AsyncRay {
     }
 
     /// Deprecated unbounded overload retained for source compatibility.
-    @available(*, deprecated, message: "Use flatMapLatest(bufferingPolicy:_:) — an unbounded output stream can grow without limit under a slow downstream consumer.")
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use flatMapLatest(bufferingPolicy:_:) — an unbounded output stream can grow without limit under a slow downstream consumer."
+    )
     public func flatMapLatest<U: Sendable>(
         _ transform: @Sendable @escaping (T) -> AsyncRay<U>
     ) -> AsyncRay<U> {
@@ -204,7 +218,12 @@ extension AsyncRay {
     }
 
     /// Deprecated unbounded overload retained for source compatibility.
-    @available(*, deprecated, message: "Use then(_:bufferingPolicy:) — an unbounded output stream can grow without limit under a slow downstream consumer.")
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use then(_:bufferingPolicy:) — an unbounded output stream can grow without limit under a slow downstream consumer."
+    )
     public func then(_ next: AsyncRay<T>) -> AsyncRay<T> {
         then(next, bufferingPolicy: .unbounded)
     }

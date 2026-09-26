@@ -29,7 +29,7 @@ import Testing
     let results = Collector<String>()
     let sub = pipe.asyncRay.sink { v in results.append(v) }
 
-    try? await Task.sleep(for: .milliseconds(20)) // Wait for subscriber registration
+    try? await Task.sleep(for: .milliseconds(20))  // Wait for subscriber registration
     pipe <- "hello"
     pipe <- "world"
     try? await Task.sleep(for: .milliseconds(40))
@@ -43,7 +43,7 @@ import Testing
     let results = Collector<Int>()
     let sub = pipe.asyncRay.sink { v in results.append(v) }
 
-    try? await Task.sleep(for: .milliseconds(25)) // Wait for subscriber registration
+    try? await Task.sleep(for: .milliseconds(25))  // Wait for subscriber registration
     pipe <- [1, 2, 3]
     try? await Task.sleep(for: .milliseconds(40))
     sub.cancel()
@@ -69,8 +69,8 @@ import Testing
 @Test func pipeFinishTwiceIsSafe() async {
     let pipe = Pipe<Int>()
     pipe.finish()
-    pipe.finish() // Should not crash or misbehave
-    
+    pipe.finish()  // Should not crash or misbehave
+
     // Subscribing after finish
     let values = await pipe.asyncRay.collect()
     #expect(values.isEmpty)
@@ -94,11 +94,11 @@ import Testing
 @Test func pipeDirectStreamProperty() async {
     let pipe = Pipe<Int>()
     let stream = pipe.stream
-    
+
     try? await Task.sleep(for: .milliseconds(10))
     pipe.send(100)
     pipe.finish()
-    
+
     var collected: [Int] = []
     for await val in stream {
         collected.append(val)
@@ -109,19 +109,19 @@ import Testing
 @Test func pipeSubscriberCount() async {
     let pipe = Pipe<Int>()
     #expect(pipe.subscriberCount == 0)
-    
+
     let sub1 = pipe.asyncRay.sink { _ in }
     try? await Task.sleep(for: .milliseconds(20))
     #expect(pipe.subscriberCount == 1)
-    
+
     let sub2 = pipe.asyncRay.sink { _ in }
     try? await Task.sleep(for: .milliseconds(20))
     #expect(pipe.subscriberCount == 2)
-    
+
     sub1.cancel()
     try? await Task.sleep(for: .milliseconds(20))
     #expect(pipe.subscriberCount == 1)
-    
+
     sub2.cancel()
     try? await Task.sleep(for: .milliseconds(20))
     #expect(pipe.subscriberCount == 0)
@@ -213,7 +213,7 @@ import Testing
 @Test func currentValueDirectStream() async {
     let state = CurrentValue("init")
     let stream = state.stream
-    
+
     var iterator = stream.makeAsyncIterator()
     let first = await iterator.next()
     #expect(first == "init")
@@ -222,11 +222,11 @@ import Testing
 @Test func currentValueCancellationCleansUp() async {
     let state = CurrentValue(1)
     let sub = state.asyncRay.sink { _ in }
-    
+
     try? await Task.sleep(for: .milliseconds(20))
     sub.cancel()
     try? await Task.sleep(for: .milliseconds(20))
-    
+
     await state.set(2)
     #expect(await state.value == 2)
 }
@@ -273,10 +273,10 @@ import Testing
 @Test func currentValueDistinctModifyAndStream() async {
     let state = CurrentValueDistinct(10)
     #expect(await state.value == 10)
-    
+
     await state.modify { $0 * 2 }
     #expect(await state.value == 20)
-    
+
     let stream = state.stream
     var iterator = stream.makeAsyncIterator()
     let val = await iterator.next()
@@ -286,11 +286,11 @@ import Testing
 @Test func currentValueDistinctCancellationCleansUp() async {
     let state = CurrentValueDistinct("a")
     let sub = state.asyncRay.sink { _ in }
-    
+
     try? await Task.sleep(for: .milliseconds(20))
     sub.cancel()
     try? await Task.sleep(for: .milliseconds(20))
-    
+
     await state.set("b")
     #expect(await state.value == "b")
 }
@@ -374,12 +374,12 @@ import Testing
 @Test func onceStreamProperty() async {
     let once = Once<Int>()
     let stream = once.stream
-    
+
     Task {
         try? await Task.sleep(for: .milliseconds(10))
         await once.resolve(42)
     }
-    
+
     var iterator = stream.makeAsyncIterator()
     let val = await iterator.next()
     #expect(val == 42)
@@ -432,4 +432,3 @@ import Testing
     #expect(val == 1 || val == 2)
     #expect(await once.currentValue == val)
 }
-

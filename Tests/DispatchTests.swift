@@ -13,18 +13,18 @@ import Foundation
 @Test func onMainCancellation() async {
     let pipe = Pipe<Int>()
     let received = Collector<Int>()
-    
+
     let sub = pipe.asyncRay.onMain().sink { v in
         received.append(v)
     }
-    
+
     try? await Task.sleep(for: .milliseconds(10))
     pipe.send(1)
     try? await Task.sleep(for: .milliseconds(20))
     sub.cancel()
     pipe.send(2)
     try? await Task.sleep(for: .milliseconds(20))
-    
+
     let values = received.values
     #expect(values == [1])
 }
@@ -37,10 +37,10 @@ import Foundation
             isMainCollector.append(isMain)
         }
     }
-    
+
     try? await Task.sleep(for: .milliseconds(50))
     sub.cancel()
-    
+
     let values = isMainCollector.values
     #expect(values == [true, true, true])
 }
@@ -56,20 +56,20 @@ import Foundation
 @Test func onBackgroundCancellationStopsStream() async {
     let pipe = Pipe<Int>()
     let received = Collector<Int>()
-    
+
     let sub = pipe.asyncRay
         .onBackground()
         .sink { v in
             received.append(v)
         }
-    
+
     try? await Task.sleep(for: .milliseconds(20))
     pipe.send(1)
     try? await Task.sleep(for: .milliseconds(20))
     sub.cancel()
     pipe.send(2)
     try? await Task.sleep(for: .milliseconds(20))
-    
+
     let values = received.values
     #expect(values == [1])
 }
@@ -83,10 +83,10 @@ import Foundation
             sideEffects.append(val * 10)
         }
         .collect()
-    
+
     try? await Task.sleep(for: .milliseconds(30))
     let sideValues = sideEffects.values
-    
+
     #expect(results == [1, 2, 3])
     #expect(sideValues == [10, 20, 30])
 }
@@ -100,10 +100,10 @@ import Foundation
             completedFired.append(true)
         }
         .collect()
-    
+
     try? await Task.sleep(for: .milliseconds(30))
     let fired = completedFired.values
-    
+
     #expect(results == ["a", "b"])
     #expect(fired == [true])
 }
@@ -138,7 +138,8 @@ import Foundation
         }
     }
 
-    let sub = asyncRay
+    let sub =
+        asyncRay
         .onCompletion {
             completedFired.append(true)
         }

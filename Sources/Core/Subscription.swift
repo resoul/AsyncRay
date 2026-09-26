@@ -1,5 +1,3 @@
-// Thread-safe subscription handle
-
 import Foundation
 
 /// An active subscription handle for `AsyncRay`.
@@ -21,6 +19,11 @@ public final class Subscription: @unchecked Sendable {
     /// Unique identifier for this subscription.
     public let id: UUID
 
+    /// Creates a subscription handle.
+    ///
+    /// - Parameters:
+    ///   - id: Identifier used by subscription containers; defaults to a new UUID.
+    ///   - cancel: Action invoked once when this subscription is cancelled.
     public init(id: UUID = UUID(), cancel: @Sendable @escaping () -> Void) {
         self.id = id
         self._cancel = cancel

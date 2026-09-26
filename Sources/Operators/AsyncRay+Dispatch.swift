@@ -1,5 +1,3 @@
-// Dispatch and side-effect operators
-
 extension AsyncRay {
 
     // MARK: - onMain
@@ -30,7 +28,9 @@ extension AsyncRay {
 
     // MARK: - onBackground
 
-    /// Dispatches value delivery inside a detached background task with the given priority.
+    /// Iterates the upstream stream in a detached task with the given priority and forwards
+    /// values from that task. No actor context or task-local values are inherited by the detached task.
+    /// Cancelling the downstream stream cancels the forwarding task.
     public func onBackground(priority: TaskPriority = .background) -> AsyncRay<T> {
         chained { continuation, stream in
             let task = Task.detached(priority: priority) {
@@ -45,9 +45,9 @@ extension AsyncRay {
 
     // MARK: - handleEvents
 
-    /// Executes a side effect for each emitted value without mutating the stream.
-    ///
-    /// Useful for debugging, logging, or metrics.
+    /// Runs a synchronous side effect for each value before forwarding that value unchanged.
+    /// Useful for debugging, logging, or metrics. The handler runs on the operator's task and
+    /// should not block for long periods.
     /// ```swift
     /// asyncRay.handleEvents { print("Got: \($0)") }.sink { process($0) }
     /// ```
@@ -62,6 +62,7 @@ extension AsyncRay {
 
     /// Executes a side effect upon completion of the stream.
     /// Does not execute the handler if the subscription was cancelled.
+    /// The handler runs after the upstream ends normally and before the downstream finishes.
     public func onCompletion(
         _ handler: @Sendable @escaping () -> Void
     ) -> AsyncRay<T> {

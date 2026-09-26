@@ -16,7 +16,8 @@ private actor _ZipRendezvous<A: Sendable, B: Sendable> {
 
     func offerA(_ value: A) async {
         guard !isFinished, !Task.isCancelled else { return }
-        let acknowledgment = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
+        let acknowledgment = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) {
+            continuation in
             pendingA = (value, continuation)
         }
         emitPairIfReady()
@@ -26,7 +27,8 @@ private actor _ZipRendezvous<A: Sendable, B: Sendable> {
 
     func offerB(_ value: B) async {
         guard !isFinished, !Task.isCancelled else { return }
-        let acknowledgment = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) { continuation in
+        let acknowledgment = AsyncStream<Void>(bufferingPolicy: .bufferingNewest(1)) {
+            continuation in
             pendingB = (value, continuation)
         }
         emitPairIfReady()
@@ -85,7 +87,9 @@ internal final class _CombineLatestState2<A: Sendable, B: Sendable>: @unchecked 
 }
 
 /// Direct 3-stream combination state, avoiding intermediate nested stream allocations.
-internal final class _CombineLatestState3<A: Sendable, B: Sendable, C: Sendable>: @unchecked Sendable {
+internal final class _CombineLatestState3<A: Sendable, B: Sendable, C: Sendable>:
+    @unchecked Sendable
+{
     private let lock = NSLock()
     private let output: AsyncStream<(A, B, C)>.Continuation
     private var a: A?
@@ -122,7 +126,9 @@ internal final class _CombineLatestState3<A: Sendable, B: Sendable, C: Sendable>
 }
 
 /// Direct 4-stream combination state.
-internal final class _CombineLatestState4<A: Sendable, B: Sendable, C: Sendable, D: Sendable>: @unchecked Sendable {
+internal final class _CombineLatestState4<A: Sendable, B: Sendable, C: Sendable, D: Sendable>:
+    @unchecked Sendable
+{
     private let lock = NSLock()
     private let output: AsyncStream<(A, B, C, D)>.Continuation
     private var a: A?
@@ -172,6 +178,8 @@ internal final class _CombineLatestState4<A: Sendable, B: Sendable, C: Sendable,
 /// Merges multiple streams of the same element type into one, with an explicit output buffering policy.
 ///
 /// Values from all streams are forwarded as they arrive. Order between distinct sources is not guaranteed.
+/// Cancelling the output subscription cancels every input subscription. The output buffering
+/// policy controls how values are retained when downstream is slower than the combined inputs.
 ///
 /// ```swift
 /// let updates = merge([localChanges, serverPush, notifications], bufferingPolicy: .bufferingNewest(64))
@@ -209,12 +217,28 @@ private func _mergeArray<T: Sendable>(
 }
 
 /// Deprecated unbounded overload retained for source compatibility.
-@available(*, deprecated, message: "Use merge(_:bufferingPolicy:) — an unbounded merge output stream can grow without limit under a slow downstream consumer.")
+/// Merges the streams using an unbounded output buffer.
+///
+/// - Important: Prefer `merge(_:bufferingPolicy:)` and choose an explicit buffer limit.
+@available(
+    *,
+    deprecated,
+    message:
+        "Use merge(_:bufferingPolicy:) — an unbounded merge output stream can grow without limit under a slow downstream consumer."
+)
 public func merge<T: Sendable>(_ asyncRays: AsyncRay<T>...) -> AsyncRay<T> {
     _mergeArray(asyncRays, bufferingPolicy: .unbounded)
 }
 
-@available(*, deprecated, message: "Use merge(_:bufferingPolicy:) — an unbounded merge output stream can grow without limit under a slow downstream consumer.")
+/// Merges the streams using an unbounded output buffer.
+///
+/// - Important: Prefer `merge(_:bufferingPolicy:)` and choose an explicit buffer limit.
+@available(
+    *,
+    deprecated,
+    message:
+        "Use merge(_:bufferingPolicy:) — an unbounded merge output stream can grow without limit under a slow downstream consumer."
+)
 public func merge<T: Sendable>(_ asyncRays: [AsyncRay<T>]) -> AsyncRay<T> {
     _mergeArray(asyncRays, bufferingPolicy: .unbounded)
 }
@@ -227,6 +251,8 @@ public func merge<T: Sendable>(_ asyncRays: [AsyncRay<T>]) -> AsyncRay<T> {
 /// **Completion semantics:** The combined stream finishes only when **all** input streams have finished.
 /// If one input stream completes while another continues emitting, new emissions will continue to be paired
 /// with the last value of the completed stream.
+/// The output `bufferingPolicy` applies to combined tuples; a bounded policy can drop older or newer tuples
+/// according to the selected `AsyncStream` policy.
 ///
 /// ```swift
 /// combineLatest(username.asyncRay, password.asyncRay, bufferingPolicy: .bufferingNewest(1))
@@ -344,8 +370,15 @@ public func combineLatest<A: Sendable, B: Sendable, C: Sendable, D: Sendable>(
     }
 }
 
-/// Deprecated unbounded overloads retained for source compatibility.
-@available(*, deprecated, message: "Use combineLatest(_:_:bufferingPolicy:) — an unbounded output stream can grow without limit under a slow downstream consumer.")
+/// Combines the latest values of two streams using an unbounded output buffer.
+///
+/// - Important: Prefer `combineLatest(_:_:bufferingPolicy:)` and choose an explicit buffer limit.
+@available(
+    *,
+    deprecated,
+    message:
+        "Use combineLatest(_:_:bufferingPolicy:) — an unbounded output stream can grow without limit under a slow downstream consumer."
+)
 public func combineLatest<A: Sendable, B: Sendable>(
     _ fa: AsyncRay<A>,
     _ fb: AsyncRay<B>
@@ -353,7 +386,15 @@ public func combineLatest<A: Sendable, B: Sendable>(
     combineLatest(fa, fb, bufferingPolicy: .unbounded)
 }
 
-@available(*, deprecated, message: "Use combineLatest(_:_:_:bufferingPolicy:) — an unbounded output stream can grow without limit under a slow downstream consumer.")
+/// Combines the latest values of three streams using an unbounded output buffer.
+///
+/// - Important: Prefer `combineLatest(_:_:_:bufferingPolicy:)` and choose an explicit buffer limit.
+@available(
+    *,
+    deprecated,
+    message:
+        "Use combineLatest(_:_:_:bufferingPolicy:) — an unbounded output stream can grow without limit under a slow downstream consumer."
+)
 public func combineLatest<A: Sendable, B: Sendable, C: Sendable>(
     _ fa: AsyncRay<A>,
     _ fb: AsyncRay<B>,
@@ -362,7 +403,15 @@ public func combineLatest<A: Sendable, B: Sendable, C: Sendable>(
     combineLatest(fa, fb, fc, bufferingPolicy: .unbounded)
 }
 
-@available(*, deprecated, message: "Use combineLatest(_:_:_:_:bufferingPolicy:) — an unbounded output stream can grow without limit under a slow downstream consumer.")
+/// Combines the latest values of four streams using an unbounded output buffer.
+///
+/// - Important: Prefer `combineLatest(_:_:_:_:bufferingPolicy:)` and choose an explicit buffer limit.
+@available(
+    *,
+    deprecated,
+    message:
+        "Use combineLatest(_:_:_:_:bufferingPolicy:) — an unbounded output stream can grow without limit under a slow downstream consumer."
+)
 public func combineLatest<A: Sendable, B: Sendable, C: Sendable, D: Sendable>(
     _ fa: AsyncRay<A>,
     _ fb: AsyncRay<B>,
@@ -376,8 +425,9 @@ public func combineLatest<A: Sendable, B: Sendable, C: Sendable, D: Sendable>(
 
 /// Pairs values from two streams 1-to-1 with an explicit output buffering policy.
 ///
-/// Both input streams are read concurrently. When either stream completes or the subscription is cancelled,
-/// the remaining pending await is cancelled and the output stream finishes.
+/// Both input streams are read concurrently and values are paired in arrival order, one from each input.
+/// When either input completes, any unmatched value is discarded, the remaining input is cancelled, and
+/// the output finishes. The output `bufferingPolicy` controls retention when downstream is slower.
 public func zip<A: Sendable, B: Sendable>(
     _ fa: AsyncRay<A>,
     _ fb: AsyncRay<B>,
@@ -415,7 +465,12 @@ public func zip<A: Sendable, B: Sendable>(
 }
 
 /// Deprecated unbounded overload retained for source compatibility.
-@available(*, deprecated, message: "Use zip(_:_:bufferingPolicy:) — an unbounded zip output stream can grow without limit under a slow downstream consumer.")
+@available(
+    *,
+    deprecated,
+    message:
+        "Use zip(_:_:bufferingPolicy:) — an unbounded zip output stream can grow without limit under a slow downstream consumer."
+)
 public func zip<A: Sendable, B: Sendable>(
     _ fa: AsyncRay<A>,
     _ fb: AsyncRay<B>
@@ -427,11 +482,22 @@ public func zip<A: Sendable, B: Sendable>(
 
 extension AsyncRay {
     /// Merges this stream with another of the same element type.
-    public func merge(with other: AsyncRay<T>, bufferingPolicy: AsyncStream<T>.Continuation.BufferingPolicy) -> AsyncRay<T> {
+    public func merge(
+        with other: AsyncRay<T>,
+        bufferingPolicy: AsyncStream<T>.Continuation.BufferingPolicy
+    ) -> AsyncRay<T> {
         _mergeArray([self, other], bufferingPolicy: bufferingPolicy)
     }
 
-    @available(*, deprecated, message: "Use merge(with:bufferingPolicy:) — an unbounded merge output stream can grow without limit under a slow downstream consumer.")
+    /// Merges this stream with another using an unbounded output buffer.
+    ///
+    /// - Important: Prefer `merge(with:bufferingPolicy:)` and choose an explicit buffer limit.
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use merge(with:bufferingPolicy:) — an unbounded merge output stream can grow without limit under a slow downstream consumer."
+    )
     public func merge(with other: AsyncRay<T>) -> AsyncRay<T> {
         _mergeArray([self, other], bufferingPolicy: .unbounded)
     }

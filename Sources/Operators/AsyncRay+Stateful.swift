@@ -1,5 +1,3 @@
-// Stateful stream operators: scan, reduce
-
 extension AsyncRay {
 
     // MARK: - scan

@@ -1,11 +1,13 @@
-// Hot push-based multicast event source
-
 import Foundation
 
 /// A hot event source that broadcasts values to all active subscribers.
 ///
 /// **Hot** means values are sent immediately to whoever is currently subscribed.
 /// A new subscriber does not receive previously emitted values.
+///
+/// Each subscriber has its own buffer, configured by `bufferingPolicy`. A bounded policy
+/// may drop values for a slow subscriber. Concurrent calls to `send(_:)` are safe, but their
+/// values have no guaranteed total order across producer tasks.
 ///
 /// For state retention and replay, use `CurrentValue`.
 public final class Pipe<T: Sendable>: @unchecked Sendable {
@@ -26,12 +28,16 @@ public final class Pipe<T: Sendable>: @unchecked Sendable {
     // MARK: - Push
 
     /// Sends a value to all active subscribers.
+    ///
+    /// Any overflow result is discarded. Use `sendObservingOverflow(_:)` to inspect whether
+    /// each subscriber accepted or dropped the value.
     public func send(_ value: T) {
         _ = sendObservingOverflow(value)
     }
 
     /// Sends a value to all active subscribers and returns a `YieldResult` per subscriber
     /// for telemetry or controlled reconnects on buffer overflows.
+    /// Returns an empty array when there are no active subscribers or the pipe has finished.
     @discardableResult
     public func sendObservingOverflow(_ value: T) -> [AsyncStream<T>.Continuation.YieldResult] {
         let all = lock.withLock { () -> [AsyncStream<T>.Continuation] in
@@ -41,7 +47,8 @@ public final class Pipe<T: Sendable>: @unchecked Sendable {
         return all.map { $0.yield(value) }
     }
 
-    /// Completes the stream. All active subscribers receive a completion signal.
+    /// Completes the stream. All active subscribers receive a completion signal, and later
+    /// subscriptions complete immediately. Calling this more than once has no effect.
     public func finish() {
         let all = lock.withLock { () -> [AsyncStream<T>.Continuation] in
             guard !isFinished else { return [] }

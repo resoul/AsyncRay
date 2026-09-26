@@ -1,6 +1,4 @@
-// Stream insertion operator <- for Pipe<T>
-
-infix operator <-: AssignmentPrecedence
+infix operator <- : AssignmentPrecedence
 
 /// Sends a value into a `Pipe`.
 ///

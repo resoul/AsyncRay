@@ -1,10 +1,8 @@
-// Thread-safe storage for AsyncRayEmitter termination and cancellation handlers.
-//
+import Foundation
+
 // Solves the late-registration race: when a producer registers cleanup after an `await` point
 // (e.g. opening a network connection), the subscription may have already been cancelled.
 // TerminationStorage records the terminal reason and immediately replays it to any newly registered handlers.
-
-import Foundation
 
 /// Thread-safe storage for termination handlers.
 ///
@@ -37,7 +35,8 @@ internal final class TerminationStorage<T: Sendable>: @unchecked Sendable {
     /// Records the terminal reason and invokes all accumulated handlers.
     /// Subsequent calls are no-ops (idempotent).
     func terminate(_ reason: AsyncStream<T>.Continuation.Termination) {
-        let snapshot: [@Sendable (AsyncStream<T>.Continuation.Termination) -> Void] = lock.withLock {
+        let snapshot: [@Sendable (AsyncStream<T>.Continuation.Termination) -> Void] = lock.withLock
+        {
             guard termination == nil else { return [] }
             termination = reason
             let copy = handlers

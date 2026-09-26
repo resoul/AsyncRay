@@ -1,5 +1,3 @@
-// Observable state holder with asynchronous replay of the current value.
-
 import Foundation
 
 /// Synchronous storage owned exclusively by one CurrentValue actor.
@@ -70,7 +68,10 @@ private func currentValueAsyncRay<T: Sendable>(
 /// An observable state holder that retains the latest value and notifies subscribers upon change.
 ///
 /// **Replay behavior:** A new subscriber asynchronously receives the current value (replay = 1),
-/// making it suitable for states (e.g. connection state, auth status).
+/// making it suitable for states (e.g. connection state, auth status). Registration and replay
+/// are serialized with updates by the actor. Its one-element buffer may coalesce intermediate
+/// updates when a subscriber is slower than the producer; it is intended for latest state, not
+/// lossless event history.
 ///
 /// ```swift
 /// let state = CurrentValue(ConnectionState.disconnected)
@@ -87,6 +88,7 @@ public actor CurrentValue<T: Sendable> {
 
     private let storage: _CurrentValueStorage<T>
 
+    /// Creates a state holder with an initial value.
     public init(_ initial: T) {
         self.storage = _CurrentValueStorage(initial)
     }
@@ -112,7 +114,10 @@ public actor CurrentValue<T: Sendable> {
 
     // MARK: - Subscription
 
-    /// Observes current state asynchronously, then the latest updates (buffer size 1).
+    /// Observes the current state, then later updates (buffer size 1).
+    ///
+    /// Registration and the initial replay are asynchronous. If updates arrive faster than
+    /// this stream is consumed, intermediate values may be coalesced and the latest value wins.
     public nonisolated var asyncRay: AsyncRay<T> {
         currentValueAsyncRay(
             register: { [weak self] id, continuation in
@@ -139,15 +144,19 @@ public actor CurrentValue<T: Sendable> {
 
 // MARK: - CurrentValueDistinct (Built-in deduplication)
 
-/// A state holder actor similar to `CurrentValue`, but skips notifying subscribers when the new value equals the current value.
+/// A state holder actor similar to `CurrentValue`, but skips notifying subscribers when the
+/// new value equals the current value. Equality is checked against the immediately preceding
+/// stored value, including updates made before any subscriber connects.
 public actor CurrentValueDistinct<T: Sendable & Equatable> {
 
     private let storage: _CurrentValueStorage<T>
 
+    /// Creates a state holder with an initial value.
     public init(_ initial: T) {
         self.storage = _CurrentValueStorage(initial)
     }
 
+    /// Reads the current value on this actor.
     public var value: T {
         get async { storage.value }
     }
@@ -157,10 +166,12 @@ public actor CurrentValueDistinct<T: Sendable & Equatable> {
         storage.setDistinct(newValue)
     }
 
+    /// Transforms and publishes the value unless it equals the previously stored value.
     public func modify(_ transform: (T) -> T) async {
         storage.modifyDistinct(transform)
     }
 
+    /// Observes the current value and distinct subsequent updates using a one-element buffer.
     public nonisolated var asyncRay: AsyncRay<T> {
         currentValueAsyncRay(
             register: { [weak self] id, continuation in
@@ -173,6 +184,7 @@ public actor CurrentValueDistinct<T: Sendable & Equatable> {
         )
     }
 
+    /// Direct `AsyncStream` view of `asyncRay`; each access creates a new subscription.
     public nonisolated var stream: AsyncStream<T> { asyncRay.stream }
 
     private func register(id: UUID, continuation: AsyncStream<T>.Continuation) {

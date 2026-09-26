@@ -1,11 +1,9 @@
-// Single-assignment asynchronous result container
-
 import Foundation
 
 /// A one-shot async result container.
 ///
-/// Pending waiters receive the resolved value upon `resolve()`.
-/// Subsequent subscribers or callers after resolution immediately receive the stored value.
+/// Pending waiters receive the resolved value upon `resolve()`. Resolution is permanent:
+/// later calls to `resolve(_:)` are ignored. Subsequent callers receive the stored value.
 ///
 /// ```swift
 /// let ready = Once<Bool>()
@@ -25,11 +23,12 @@ public actor Once<T: Sendable> {
     private var legacyWaiters: [CheckedContinuation<T, Never>] = []
     private var cancellableWaiters: [UUID: CheckedContinuation<T?, Never>] = [:]
 
+    /// Creates a pending one-shot result.
     public init() {}
 
     // MARK: - Resolve
 
-    /// Resolves the value. Subsequent calls are ignored (resolves exactly once).
+    /// Resolves the value and resumes all current waiters. Subsequent calls are ignored.
     public func resolve(_ value: T) {
         guard resolved == nil else { return }
         resolved = value
@@ -97,11 +96,16 @@ public actor Once<T: Sendable> {
     }
 
     /// The current resolved value, or `nil` if pending (non-blocking).
+    ///
+    /// When `T` is optional, the result is a nested optional: outer `nil` means pending,
+    /// while `.some(nil)` means resolved with a `nil` value.
     public var currentValue: T? { resolved }
 
     // MARK: - AsyncRay Integration
 
     /// A single-element `AsyncRay`: awaits resolution, emits the value, and completes.
+    /// Cancelling a subscription cancels its wait without affecting other waiters or resolving
+    /// the `Once` instance.
     public nonisolated var asyncRay: AsyncRay<T> {
         AsyncRay { [weak self] in
             AsyncStream<T> { continuation in

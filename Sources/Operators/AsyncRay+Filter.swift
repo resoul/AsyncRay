@@ -1,5 +1,3 @@
-// Stream filtering and bounding operators
-
 extension AsyncRay {
 
     // MARK: - filter

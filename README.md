@@ -50,6 +50,7 @@ Designed for modern Swift development, checked in Swift 6 language mode with com
     - [Auth Form Validation](#2-auth-form-validation)
     - [Connection State UI Binding](#3-connection-state-ui-binding)
 - [Building and Testing](#building-and-testing)
+- [Code Style and API Documentation](#code-style-and-api-documentation)
 - [Changelog](#changelog)
 - [License](#license)
 
@@ -502,6 +503,25 @@ make test-swift5
 Library compilation treats warnings as errors. Tests that exercise deprecated compatibility
 overloads are themselves marked `@available(*, deprecated)`, so their intentional calls do not
 produce deprecation warnings.
+
+### Code Style and API Documentation
+
+The repository uses `swift-format`; its settings live in [`.swift-format`](.swift-format).
+`make lint-format` runs the strict check. Format a file when you work on it, or use the full
+source and test trees when making a deliberate repository-wide formatting pass:
+
+```sh
+# Report findings across the source and test trees
+make lint-format
+
+# Format one file while working on it
+make format-swift SWIFT_PATHS=Sources/Core/AsyncRay.swift
+```
+
+When documenting public APIs, explain behavior that affects how callers use them: ownership and
+cancellation, actor isolation, buffering and possible value loss, ordering, completion, or errors.
+Include only the topics that apply to that API. Avoid file-title comments above imports; put useful
+implementation context after imports and API documentation beside the declaration it describes.
 
 ---
 

@@ -1,5 +1,3 @@
-// Time and rate-limiting operators: debounce, throttle, delay, timeout
-
 extension AsyncRay {
 
     // MARK: - delay
@@ -18,7 +16,8 @@ extension AsyncRay {
         chained { continuation, stream in
             // Reading is decoupled from sleeping so a sleep never postpones stamping later values.
             // The in-flight queue holds only values not yet due, i.e. at most `duration` worth of input.
-            let (pending, pendingContinuation) = AsyncStream<(ContinuousClock.Instant, T)>.makeStream()
+            let (pending, pendingContinuation) = AsyncStream<(ContinuousClock.Instant, T)>
+                .makeStream()
             let reader = Task {
                 for await value in stream {
                     pendingContinuation.yield((ContinuousClock.now.advanced(by: duration), value))
@@ -49,6 +48,8 @@ extension AsyncRay {
     /// Waits for a quiet window of `duration` and emits the **latest** value.
     ///
     /// Ideal for search fields and rapid user input.
+    /// A pending value is emitted after the quiet window even if upstream completes during
+    /// that window. Cancellation drops the pending value.
     /// ```swift
     /// searchField.textAsyncRay
     ///     .debounce(.milliseconds(300))
@@ -59,15 +60,17 @@ extension AsyncRay {
             let taskBox = TaskBox<Void>()
             let outerTask = Task {
                 for await value in stream {
-                    taskBox.replace(with: Task {
-                        do {
-                            try await Task.sleep(for: duration)
-                            guard !Task.isCancelled else { return }
-                            continuation.yield(value)
-                        } catch {
-                            // Task cancelled — do not emit
+                    taskBox.replace(
+                        with: Task {
+                            do {
+                                try await Task.sleep(for: duration)
+                                guard !Task.isCancelled else { return }
+                                continuation.yield(value)
+                            } catch {
+                                // Task cancelled — do not emit
+                            }
                         }
-                    })
+                    )
                 }
                 // Await last pending debounce before regular completion
                 await taskBox.snapshot()?.value
@@ -112,6 +115,9 @@ extension AsyncRay {
     // MARK: - timeout
 
     /// Completes the stream if no value is received within `duration`.
+    /// The timer starts when the subscription begins and resets after each value. A quiet
+    /// timeout completes normally without an error; values received after the timeout are not
+    /// forwarded. Normal upstream completion also completes the output.
     ///
     /// ```swift
     /// networkAsyncRay.timeout(.seconds(30)).sink(
@@ -123,10 +129,12 @@ extension AsyncRay {
         chained { continuation, stream in
             let watchdogBox = TaskBox<Void>()
             func armWatchdog() {
-                watchdogBox.replace(with: Task {
-                    try? await Task.sleep(for: duration)
-                    if !Task.isCancelled { continuation.finish() }
-                })
+                watchdogBox.replace(
+                    with: Task {
+                        try? await Task.sleep(for: duration)
+                        if !Task.isCancelled { continuation.finish() }
+                    }
+                )
             }
 
             let outerTask = Task {

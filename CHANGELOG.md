@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+- Added `swift-format` configuration plus Makefile targets to lint and format selected Swift paths.
+- Expanded public API documentation for cancellation, buffering, ordering, completion, and stream bridging behavior.
+
+### Changed
+- Applied the configured Swift formatting to source and test files; removed redundant file-title comments above imports.
+- Updated `test-phone` to use the available iPhone 18 Pro simulator destination.
+
 ## [1.0.0] - 2026-09-25
 
 First release of AsyncRay.

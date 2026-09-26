@@ -318,4 +318,3 @@ actor ConcurrencyWatermark {
     let second = await asyncRay.collect()
     #expect(second.isEmpty)
 }
-
