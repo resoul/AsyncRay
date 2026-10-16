@@ -589,7 +589,7 @@ time moves only when a test calls `advance(by:)`; timing-operator tests built on
 ([`Tests/ClockTests.swift`](Tests/ClockTests.swift)) assert exact deadlines without wall-clock sleeps.
 
 CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs `lint-format`, `build-swift6`,
-`test-swift6` and `test-swift5` on macOS, and the Swift 6 build and tests on Linux.
+`test-swift6` and `test-swift5` on macOS.
 
 Library compilation treats warnings as errors. Tests that exercise deprecated compatibility
 overloads are themselves marked `@available(*, deprecated)`, so their intentional calls do not

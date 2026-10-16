@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New operators: `throttle(_:latest:)` (trailing throttle), `AsyncRay.interval(_:)`, `chunks(ofCount:)`, `prepend(_:)`, `withLatestFrom(_:)`, and `skipRepeats(by:)`. Timing variants accept a `clock:` argument.
 - `share(bufferingPolicy:)` shares one upstream subscription of a cold `AsyncRay` among its subscribers and reconnects for the next subscriber after the last one leaves or upstream completes.
 - `.gitignore` for SwiftPM, Xcode, and Bazel build output.
-- GitHub Actions CI: formatting lint, strict Swift 6 build, and tests in Swift 6 and Swift 5 modes on macOS; Swift 6 build and tests on Linux.
+- GitHub Actions CI: formatting lint, strict Swift 6 build, and tests in Swift 6 and Swift 5 modes on macOS.
 
 ### Changed
 - `sink(_:)`, `sink(next:completed:)`, and `sinkOnMain(_:)` are no longer `@discardableResult`: the compiler now warns when a subscription handle is dropped, because a dropped subscription is never cancelled. Use `store(in:)`, keep the handle, or write `_ =` to opt out.

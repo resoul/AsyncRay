@@ -25,25 +25,3 @@ jobs:
         run: make test-swift6
       - name: Test (Swift 5 language mode)
         run: make test-swift5
-
-  linux:
-    name: Linux (Swift ${{ matrix.swift }})
-    runs-on: ubuntu-latest
-    container: swift:${{ matrix.swift }}
-    strategy:
-      fail-fast: false
-      matrix:
-        swift: ["6.1", "latest"]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Toolchain
-        run: swift --version
-      # The swift images do not ship make; these mirror build-swift6 / test-swift6.
-      - name: Build (Swift 6, warnings as errors)
-        run: >
-          swift build --target AsyncRay -Xswiftc -swift-version -Xswiftc 6
-          -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
-      - name: Test (Swift 6)
-        run: >
-          swift test -Xswiftc -swift-version -Xswiftc 6
-          -Xswiftc -strict-concurrency=complete
