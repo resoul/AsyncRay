@@ -66,6 +66,12 @@ public actor Once<T: Sendable> {
     ///
     /// - Important: Not cancellation-aware: a cancelled caller stays suspended until
     ///   `resolve(_:)` is called. Prefer `value` when the caller may be cancelled.
+    @available(
+        *,
+        deprecated,
+        message:
+            "Use `try await value` — wait() is not cancellation-aware and keeps a cancelled caller suspended until resolve(_:)."
+    )
     public func wait() async -> T {
         if let value = resolved { return value }
         return await withCheckedContinuation { continuation in

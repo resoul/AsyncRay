@@ -46,6 +46,7 @@ extension AsyncRay: AsyncSequence {
                 for await value in _make() {
                     continuation.yield(value)
                 }
+                guard !Task.isCancelled else { return }
                 continuation.finish()
             }
             continuation.onTermination = { @Sendable _ in task.cancel() }

@@ -10,15 +10,10 @@ extension AsyncRay {
     public func map<U: Sendable>(
         _ transform: @Sendable @escaping (T) -> U
     ) -> AsyncRay<U> {
-        chained { continuation, stream in
-            let task = Task {
-                for await value in stream {
-                    continuation.yield(transform(value))
-                }
-                guard !Task.isCancelled else { return }
-                continuation.finish()
+        chainedTask { stream, continuation in
+            for await value in stream {
+                continuation.yield(transform(value))
             }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 
@@ -34,16 +29,11 @@ extension AsyncRay {
     public func asyncMap<U: Sendable>(
         _ transform: @Sendable @escaping (T) async -> U
     ) -> AsyncRay<U> {
-        chained { continuation, stream in
-            let task = Task {
-                for await value in stream {
-                    guard !Task.isCancelled else { break }
-                    continuation.yield(await transform(value))
-                }
-                guard !Task.isCancelled else { return }
-                continuation.finish()
+        chainedTask { stream, continuation in
+            for await value in stream {
+                guard !Task.isCancelled else { break }
+                continuation.yield(await transform(value))
             }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 
@@ -57,17 +47,12 @@ extension AsyncRay {
     public func compactMap<U: Sendable>(
         _ transform: @Sendable @escaping (T) -> U?
     ) -> AsyncRay<U> {
-        chained { continuation, stream in
-            let task = Task {
-                for await value in stream {
-                    if let mapped = transform(value) {
-                        continuation.yield(mapped)
-                    }
+        chainedTask { stream, continuation in
+            for await value in stream {
+                if let mapped = transform(value) {
+                    continuation.yield(mapped)
                 }
-                guard !Task.isCancelled else { return }
-                continuation.finish()
             }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
         }
     }
 

@@ -43,9 +43,9 @@ import Foundation
 ///
 /// | Category | Operators | Guarantee |
 /// | --- | --- | --- |
-/// | Preserves relative order | `map`, `filter`, `compactMap`, `take`, `skip`, `prefix`, `drop`, `then`, `skipRepeats`, `scan` | Output follows upstream order. |
+/// | Preserves relative order | `map`, `filter`, `compactMap`, `take`, `skip`, `prefix`, `drop`, `then`, `prepend`, `skipRepeats`, `scan`, `chunks` | Output follows upstream order. |
 /// | Time-filtered | `debounce`, `throttle` | Relative order of delivered values is preserved, but intermediate values may be dropped. |
-/// | Multi-source concurrent | `merge`, `flatMap`, `combineLatest`, `zip` | Delivery depends on task completion and concurrency runtime scheduling. |
+/// | Multi-source concurrent | `merge`, `flatMap`, `combineLatest`, `zip`, `withLatestFrom` | Delivery depends on task completion and concurrency runtime scheduling. |
 /// | Time-shifted | `delay` | Order and spacing are preserved; every value is shifted by the same duration. |
 /// | Switch-to-latest | `flatMapLatest` | Previous inner stream is cancelled when a new outer value arrives. Output completes after the outer and the latest inner complete. |
 public struct AsyncRay<T: Sendable>: Sendable {
@@ -144,11 +144,18 @@ public struct AsyncRay<T: Sendable>: Sendable {
 
     /// A stream that waits for `duration` and completes without emitting values.
     public static func timer(_ duration: Duration) -> AsyncRay<T> {
+        timer(duration, clock: ContinuousClock())
+    }
+
+    /// A stream that waits for `duration`, measured by `clock`, and completes without
+    /// emitting values. Pass a custom clock to control time deterministically.
+    public static func timer<C: Clock>(_ duration: Duration, clock: C) -> AsyncRay<T>
+    where C.Duration == Duration {
         AsyncRay {
             AsyncStream<T> { continuation in
                 let task = Task {
                     do {
-                        try await Task.sleep(for: duration)
+                        try await clock.sleep(for: duration)
                         guard !Task.isCancelled else { return }
                         continuation.finish()
                     } catch {
@@ -175,6 +182,23 @@ public struct AsyncRay<T: Sendable>: Sendable {
         }
     }
 
+    /// Builds a downstream operator whose `body` consumes upstream on a single task.
+    ///
+    /// Cancelling downstream cancels the task. When `body` returns and the task was not
+    /// cancelled, downstream finishes, so `body` only forwards values and never calls `finish()`.
+    internal func chainedTask<U: Sendable>(
+        _ body: @Sendable @escaping (AsyncStream<T>, AsyncStream<U>.Continuation) async -> Void
+    ) -> AsyncRay<U> {
+        chained { continuation, stream in
+            let task = Task {
+                await body(stream, continuation)
+                guard !Task.isCancelled else { return }
+                continuation.finish()
+            }
+            continuation.onTermination = { @Sendable _ in task.cancel() }
+        }
+    }
+
     // MARK: - Subscription
 
     /// Subscribes to receive stream values.
@@ -185,7 +209,6 @@ public struct AsyncRay<T: Sendable>: Sendable {
     ///   specific actor is guaranteed; use `sinkOnMain(_:)` for `MainActor` delivery.
     /// - Important: Cancellation stops future delivery after it is observed. A callback
     ///   already running may finish.
-    @discardableResult
     public func sink(
         _ handler: @Sendable @escaping (T) -> Void
     ) -> Subscription {
@@ -209,7 +232,6 @@ public struct AsyncRay<T: Sendable>: Sendable {
     /// `completed` runs only after normal stream completion, not when the subscription is
     /// cancelled. Both callbacks run on the subscription task; use `sinkOnMain(_:)` when
     /// values must be handled on `MainActor`.
-    @discardableResult
     public func sink(
         next: @Sendable @escaping (T) -> Void,
         completed: @Sendable @escaping () -> Void
@@ -234,7 +256,7 @@ public struct AsyncRay<T: Sendable>: Sendable {
     ///
     /// Recommended for UI bindings without extra intermediate thread dispatching.
     /// The handler runs on `MainActor`; cancellation does not interrupt a callback already running.
-    @discardableResult @MainActor
+    @MainActor
     public func sinkOnMain(
         _ handler: @MainActor @escaping (T) -> Void
     ) -> Subscription {
@@ -287,7 +309,7 @@ public struct AsyncRay<T: Sendable>: Sendable {
     }
 }
 
-private final class _SubscriptionBox: @unchecked Sendable {
+internal final class _SubscriptionBox: @unchecked Sendable {
     private let lock = NSLock()
     private var _subscription: Subscription?
     private var _completed = false

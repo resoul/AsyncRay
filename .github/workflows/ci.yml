@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    name: macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version
+      - name: Lint formatting
+        run: make lint-format
+      - name: Build (Swift 6, warnings as errors)
+        run: make build-swift6
+      - name: Test (Swift 6)
+        run: make test-swift6
+      - name: Test (Swift 5 language mode)
+        run: make test-swift5
+
+  linux:
+    name: Linux (Swift ${{ matrix.swift }})
+    runs-on: ubuntu-latest
+    container: swift:${{ matrix.swift }}
+    strategy:
+      fail-fast: false
+      matrix:
+        swift: ["6.1", "latest"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: swift --version
+      # The swift images do not ship make; these mirror build-swift6 / test-swift6.
+      - name: Build (Swift 6, warnings as errors)
+        run: >
+          swift build --target AsyncRay -Xswiftc -swift-version -Xswiftc 6
+          -Xswiftc -strict-concurrency=complete -Xswiftc -warnings-as-errors
+      - name: Test (Swift 6)
+        run: >
+          swift test -Xswiftc -swift-version -Xswiftc 6
+          -Xswiftc -strict-concurrency=complete

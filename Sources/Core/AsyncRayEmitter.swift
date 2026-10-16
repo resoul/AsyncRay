@@ -11,7 +11,7 @@
 public final class AsyncRayEmitter<T: Sendable>: Sendable {
 
     private let continuation: AsyncStream<T>.Continuation
-    private let storage = TerminationStorage<T>()
+    private let storage = TerminationStorage<AsyncStream<T>.Continuation.Termination>()
 
     internal init(continuation: AsyncStream<T>.Continuation) {
         self.continuation = continuation

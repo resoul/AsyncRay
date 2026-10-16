@@ -20,6 +20,7 @@ extension AsyncRay {
                 for await value in stream {
                     continuation.yield(value)
                 }
+                guard !Task.isCancelled else { return }
                 continuation.finish()
             }
             continuation.onTermination = { @Sendable _ in task.cancel() }
@@ -37,6 +38,7 @@ extension AsyncRay {
                 for await value in stream {
                     continuation.yield(value)
                 }
+                guard !Task.isCancelled else { return }
                 continuation.finish()
             }
             continuation.onTermination = { @Sendable _ in task.cancel() }
@@ -66,16 +68,12 @@ extension AsyncRay {
     public func onCompletion(
         _ handler: @Sendable @escaping () -> Void
     ) -> AsyncRay<T> {
-        chained { continuation, stream in
-            let task = Task {
-                for await value in stream {
-                    continuation.yield(value)
-                }
-                guard !Task.isCancelled else { return }
-                handler()
-                continuation.finish()
+        chainedTask { stream, continuation in
+            for await value in stream {
+                continuation.yield(value)
             }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
+            guard !Task.isCancelled else { return }
+            handler()
         }
     }
 }

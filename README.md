@@ -42,6 +42,8 @@ Designed for modern Swift development, checked in Swift 6 language mode with com
     - [Timing & Rate Limiting](#timing--rate-limiting)
     - [Combining Multiple Streams](#combining-multiple-streams)
     - [Dispatching & Side Effects](#dispatching--side-effects)
+    - [Sharing](#sharing)
+- [Error Handling](#error-handling)
 - [Native Swift Async & Bridges](#native-swift-async--bridges)
 - [Order Guarantees](#order-guarantees)
 - [Protocol Boundary](#protocol-boundary)
@@ -172,7 +174,7 @@ queries <- "apple"
 - `Subscription`: Thread-safe handle for an active subscription. Calling `sub.cancel()` immediately stops delivery and cancels associated background tasks.
 - `SubscriptionBag`: Subscription container. Automatically cancels all stored subscriptions on `deinit` or `bag.cancelAll()`.
 
-> **Note:** A `Subscription` is not cancelled when the handle is released — `sink` is `@discardableResult`, and a discarded subscription keeps running until its stream completes. Always `store(in:)` a bag or keep the handle and call `cancel()`.
+> **Note:** A `Subscription` is not cancelled when the handle is released — a discarded subscription keeps running until its stream completes. The compiler warns when a `sink` result is unused; `store(in:)` a bag or keep the handle and call `cancel()`. For a finite stream you deliberately let run to completion, write `_ = stream.sink { ... }`.
 
 ```swift
 final class ChatViewController: NSViewController {
@@ -294,11 +296,8 @@ await authReady.resolve(true)
 // Await directly (throws CancellationError if the waiting task is cancelled):
 let isReady = try await authReady.value
 
-// Non-throwing variant; not cancellation-aware, stays suspended until resolve(_:):
-let isReadyLegacy = await authReady.wait()
-
 // Or reactive subscription (emits 1 value and completes):
-authReady.asyncRay.sink { isReady in ... }
+authReady.asyncRay.sink { isReady in ... }.store(in: bag)
 ```
 
 ---
@@ -312,6 +311,7 @@ authReady.asyncRay.sink { isReady in ... }
 | `AsyncRay.never()` | A stream that never emits values and never completes. |
 | `AsyncRay.from(sequence)` | Emits all elements from a collection/sequence in order, then completes. |
 | `AsyncRay.timer(duration)` | Waits for the specified `Duration` and completes without emitting values. |
+| `AsyncRay.interval(period)` | Emits `0, 1, 2, ...` every `period` on fixed deadlines and never completes. Keeps only the newest tick for a slow consumer. |
 | `AsyncRay { emitter in ... }` | Custom generator closure with full control over emission and lifecycle callbacks. |
 
 ---
@@ -325,9 +325,11 @@ authReady.asyncRay.sink { isReady in ... }
 - `compactMap { ... }` — Transforms values and unwraps/filters out `nil` results.
 - `scan(initial) { acc, next in ... }` — Emits running intermediate accumulation over elements for each upstream value.
 - `reduce(initial) { acc, next in ... }` — Emits single final accumulated result upon normal stream completion (emits `initial` for empty streams).
+- `chunks(ofCount:)` — Groups values into arrays of `count` elements; a shorter remainder is emitted when upstream completes.
 - `flatMap(maxConcurrent:bufferingPolicy:) { ... }` — Transforms each value into an inner `AsyncRay` and merges results concurrently up to `maxConcurrent` active tasks.
 - `flatMapLatest(bufferingPolicy:) { ... }` — Transforms each value into an inner `AsyncRay`, cancelling the previous inner stream when a new outer value arrives. **Completion semantics:** when the outer stream completes, the latest inner stream keeps running and the output completes after it (like Combine's `switchToLatest`), so `AsyncRay.just(query).flatMapLatest(bufferingPolicy: .bufferingNewest(1)) { api.search($0) }` delivers the search result.
 - `then(nextAsyncRay, bufferingPolicy:)` — Subscribes to `nextAsyncRay` strictly after the current stream completes.
+- `prepend(values...)` — Emits the given values first, then the values of the stream.
 
 ### Filtering
 
@@ -337,19 +339,28 @@ authReady.asyncRay.sink { isReady in ... }
 - `prefix(while:)` — Emits values as long as the predicate holds `true`, then completes.
 - `drop(while:)` — Drops values as long as the predicate holds `true`, then emits all remaining values.
 - `skipRepeats()` — Drops consecutive duplicate values (requires `T: Equatable`).
+- `skipRepeats(by:)` — Drops a value when a custom equivalence matches it to the previously forwarded value (e.g. `{ $0.id == $1.id }`).
 
 ### Timing & Rate Limiting
 
 - `delay(duration)` — Shifts the timeline by `duration`: each value is delivered `duration` after it arrived, preserving order and spacing. Values arriving together are delivered together (the delay does not accumulate).
 - `debounce(duration)` — Waits for a quiet period of `duration` before delivering the **latest** value (ideal for text search fields).
 - `throttle(duration)` — Limits emission rate to at most once per `duration` (leading throttle — delivers the **first** value in each window).
+- `throttle(duration, latest: true)` — Delivers the first value immediately, then at the end of each window the **latest** value received during it (trailing throttle, useful for scroll or slider updates). A pending value is delivered before completion.
 - `timeout(duration)` — Completes the stream if no values are received within `duration`.
+
+Each timing operator, `AsyncRay.timer`, and `AsyncRay.interval` also accept a `clock:` argument (any `Clock` whose `Duration` is `Swift.Duration`). The default is `ContinuousClock`; pass a manual test clock to drive time deterministically in tests:
+
+```swift
+let results = query.asyncRay.debounce(.milliseconds(300), clock: testClock)
+```
 
 ### Combining Multiple Streams
 
 - `merge([asyncRay1, asyncRay2], bufferingPolicy:)` — Merges values from multiple streams of the same type as they arrive.
 - `combineLatest(fa, fb, bufferingPolicy:)` — Combines latest values from 2, 3, or 4 streams into a tuple whenever any input changes (starts emitting once each source has emitted at least once). **Completion semantics:** Output completes only when *all* input streams complete; if one input stream finishes while others continue, new emissions continue pairing with the finished stream's last value. Tuples are emitted in the order state changes, so the last emitted tuple always reflects the latest value of every input.
 - `zip(fa, fb, bufferingPolicy:)` — Pairs values from two streams 1-to-1 concurrently. If either stream finishes or the subscription is cancelled, pending reads are cancelled and the stream completes.
+- `withLatestFrom(other)` — Pairs each value with the latest value of `other`; emits only when the source emits, drops source values that arrive before `other` has emitted, and completes with the source.
 
 ### Dispatching & Side Effects
 
@@ -358,6 +369,78 @@ authReady.asyncRay.sink { isReady in ... }
 - `onBackground(priority:)` — Dispatches delivery inside a detached background task with the specified priority.
 - `handleEvents { ... }` — Executes a side effect for each value without mutating the stream (logging/metrics).
 - `onCompletion { ... }` — Executes a side effect upon normal stream completion (does not fire on cancellation).
+
+### Sharing
+
+- `share(bufferingPolicy:)` — Shares one upstream subscription among all subscribers. Upstream starts with the first subscriber and is cancelled when the last one leaves; after that, or after upstream completes, the next subscriber starts a fresh upstream subscription. No values are replayed, and each subscriber has its own buffer (default `.bufferingNewest(64)`).
+
+```swift
+let profile = api.fetchProfile().share()
+profile.sinkOnMain { header.update($0) }.store(in: bag)
+profile.sinkOnMain { avatar.update($0) }.store(in: bag)  // one request, two subscribers
+```
+
+---
+
+## Error Handling
+
+`AsyncRay<T>` never fails. For streams that can, use `AsyncThrowingRay<T>`, the failable counterpart built on `AsyncThrowingStream`. It is also cold, and it ends in exactly one way: normal completion, failure with an error, or cancellation. Cancellation reports neither completion nor failure.
+
+```swift
+// One async operation per subscription
+let user = AsyncThrowingRay.from { try await api.fetchUser(id) }
+
+// A custom producer that can fail
+let frames = AsyncThrowingRay<Data> { emitter in
+    let socket = openSocket()
+    emitter.onCancellation { socket.close() }
+    socket.onFrame { emitter.send($0) }
+    socket.onError { emitter.fail($0) }
+}
+
+// A failing step inside a non-failing pipeline
+let messages = pipe.asyncRay.tryMap { try JSONDecoder().decode(Message.self, from: $0) }
+
+// Handle the failure in the subscriber...
+user.sinkOnMain(
+    next: { profileView.show($0) },
+    failure: { errorBanner.show($0) }
+).store(in: bag)
+
+// ...or recover and continue as a non-failing AsyncRay
+user
+    .retry(2, delay: .seconds(1))
+    .catch { _ in AsyncRay.just(.guest) }
+    .sinkOnMain { profileView.show($0) }
+    .store(in: bag)
+```
+
+| API | Description |
+| --- | --- |
+| `AsyncThrowingRay.from { try await ... }` | Runs one async throwing operation per subscription; emits its result or fails. |
+| `AsyncThrowingRay { emitter in ... }` | Custom producer; `emitter.fail(error)` ends the stream with an error. |
+| `just`, `from(sequence)`, `fail(error)`, `empty()` | Basic sources. |
+| `map`, `tryMap`, `asyncMap`, `compactMap`, `filter` | Transformations; `tryMap` and `asyncMap` may throw, which fails the stream and cancels upstream. |
+| `onFailure { error in ... }` | Side effect on failure (logging); forwards the failure. |
+| `retry(n)`, `retry(n, delay:)`, `retry(n, delay:clock:)` | Resubscribes after a failure up to `n` times. Values from failed attempts are already delivered. |
+| `catch { error in AsyncRay<T> }` | Switches to a fallback stream on failure; returns a non-failing `AsyncRay`. |
+| `replaceError(with:)` | Emits one fallback value on failure and completes; returns `AsyncRay`. |
+| `asResult()` | Materializes values and the failure as `Result`s in a non-failing `AsyncRay`. |
+| `sink(next:failure:completed:)`, `sinkOnMain(next:failure:completed:)` | Subscriptions; exactly one of `failure` or `completed` runs unless cancelled. |
+| `stream`, `first()`, `collect()`, `for try await` | Native async access; `first()` and `collect()` rethrow the failure. |
+| `asyncRay.asThrowing()`, `asyncRay.tryMap { ... }` | Move from `AsyncRay` into the failable world. |
+
+Inside a `flatMapLatest` (for example, search-as-you-type), recover per request so that one failed request does not end the whole pipeline:
+
+```swift
+query.asyncRay
+    .debounce(.milliseconds(300))
+    .flatMapLatest(bufferingPolicy: .bufferingNewest(1)) { text in
+        AsyncThrowingRay.from { try await api.search(text) }.replaceError(with: [])
+    }
+    .sinkOnMain { resultsView.show($0) }
+    .store(in: bag)
+```
 
 ---
 
@@ -382,7 +465,8 @@ let allValues = await asyncRay.collect()
 // 4. Convert native AsyncStream into AsyncRay (lazy, ref-counted shared multicast bridge)
 let asyncRayFromStream = nativeAsyncStream.asAsyncRay()
 
-// 5. Convert to throwing stream (for APIs that expect one; AsyncRay itself never throws)
+// 5. Convert to throwing stream (for APIs that expect one; AsyncRay itself never throws —
+//    see AsyncThrowingRay for streams that can fail)
 let throwing = asyncRay.throwingStream
 ```
 
@@ -392,10 +476,10 @@ let throwing = asyncRay.throwingStream
 
 | Category | Operators | Order Guarantee |
 |---|---|---|
-| **Sequential** | `map`, `filter`, `compactMap`, `take`, `skip`, `prefix`, `drop`, `then`, `skipRepeats`, `scan` | Result strictly follows upstream order. |
+| **Sequential** | `map`, `filter`, `compactMap`, `take`, `skip`, `prefix`, `drop`, `then`, `prepend`, `skipRepeats`, `scan`, `chunks` | Result strictly follows upstream order. |
 | **Time-filtering** | `debounce`, `throttle` | Relative order of delivered values is preserved (intermediate items may be dropped). |
 | **Time-shifting** | `delay` | Upstream order and spacing are preserved; every value is shifted by the same duration. |
-| **Concurrent (Fan-in / Multi-source)** | `merge`, `flatMap`, `combineLatest`, `zip` | Order between sources depends on parallel task completion and runtime scheduling. |
+| **Concurrent (Fan-in / Multi-source)** | `merge`, `flatMap`, `combineLatest`, `zip`, `withLatestFrom` | Order between sources depends on parallel task completion and runtime scheduling. |
 | **Switch-to-latest** | `flatMapLatest` | Previous inner stream is cancelled when a new outer value arrives; no value from it is delivered after the switch. Output completes after both the outer and the latest inner complete. |
 
 ---
@@ -499,6 +583,13 @@ make build-swift6
 make test-swift6
 make test-swift5
 ```
+
+The test suite includes a `ManualClock` ([`Tests/ManualClock.swift`](Tests/ManualClock.swift)) whose
+time moves only when a test calls `advance(by:)`; timing-operator tests built on it
+([`Tests/ClockTests.swift`](Tests/ClockTests.swift)) assert exact deadlines without wall-clock sleeps.
+
+CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs `lint-format`, `build-swift6`,
+`test-swift6` and `test-swift5` on macOS, and the Swift 6 build and tests on Linux.
 
 Library compilation treats warnings as errors. Tests that exercise deprecated compatibility
 overloads are themselves marked `@available(*, deprecated)`, so their intentional calls do not

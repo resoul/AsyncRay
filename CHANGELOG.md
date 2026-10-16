@@ -10,10 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added `swift-format` configuration plus Makefile targets to lint and format selected Swift paths.
 - Expanded public API documentation for cancellation, buffering, ordering, completion, and stream bridging behavior.
+- `delay`, `debounce`, `throttle`, `timeout`, and `AsyncRay.timer` accept a `clock:` argument for any `Clock` with `Swift.Duration`; the existing overloads keep using `ContinuousClock`.
+- A `ManualClock` test helper and deterministic timing-operator tests that advance time explicitly.
+- `AsyncThrowingRay<T>`: a cold, failable stream built on `AsyncThrowingStream`, with `AsyncThrowingRayEmitter`, `from { try await ... }`, `just`, `fail`, `empty`, `map`, `tryMap`, `asyncMap`, `compactMap`, `filter`, `onFailure`, `retry` (with optional delay and clock), `catch`, `replaceError(with:)`, `asResult()`, `sink(next:failure:completed:)`, `sinkOnMain(next:failure:completed:)`, and `AsyncSequence` conformance. `AsyncRay` gains `asThrowing()` and `tryMap`.
+- New operators: `throttle(_:latest:)` (trailing throttle), `AsyncRay.interval(_:)`, `chunks(ofCount:)`, `prepend(_:)`, `withLatestFrom(_:)`, and `skipRepeats(by:)`. Timing variants accept a `clock:` argument.
+- `share(bufferingPolicy:)` shares one upstream subscription of a cold `AsyncRay` among its subscribers and reconnects for the next subscriber after the last one leaves or upstream completes.
+- `.gitignore` for SwiftPM, Xcode, and Bazel build output.
+- GitHub Actions CI: formatting lint, strict Swift 6 build, and tests in Swift 6 and Swift 5 modes on macOS; Swift 6 build and tests on Linux.
 
 ### Changed
+- `sink(_:)`, `sink(next:completed:)`, and `sinkOnMain(_:)` are no longer `@discardableResult`: the compiler now warns when a subscription handle is dropped, because a dropped subscription is never cancelled. Use `store(in:)`, keep the handle, or write `_ =` to opt out.
 - Applied the configured Swift formatting to source and test files; removed redundant file-title comments above imports.
 - Updated `test-phone` to use the available iPhone 18 Pro simulator destination.
+- Single-task unary operators share one internal helper; `onMain`, `onBackground`, and `throwingStream` now match the other operators and do not finish downstream after cancellation.
+
+### Deprecated
+- `Once.wait()`: it is not cancellation-aware. Use `try await value`.
+
+### Fixed
+- `asAsyncRay()` subscribers cancelled while their registration was still in flight could stay registered, keeping the upstream pump running with no live subscriber.
 
 ## [1.0.0] - 2026-09-25
 

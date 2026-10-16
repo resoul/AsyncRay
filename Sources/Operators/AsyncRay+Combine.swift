@@ -502,3 +502,69 @@ extension AsyncRay {
         _mergeArray([self, other], bufferingPolicy: .unbounded)
     }
 }
+
+// MARK: - prepend / withLatestFrom
+
+extension AsyncRay {
+
+    /// Emits `values` first, then the values of this stream.
+    ///
+    /// Upstream is subscribed when the output is, so values a hot source sends meanwhile are
+    /// buffered and follow the prepended values.
+    ///
+    /// ```swift
+    /// searchResults.prepend([]).sinkOnMain { tableView.show($0) }  // start with an empty list
+    /// ```
+    public func prepend(_ values: [T]) -> AsyncRay<T> {
+        chainedTask { stream, continuation in
+            for value in values { continuation.yield(value) }
+            for await value in stream { continuation.yield(value) }
+        }
+    }
+
+    /// Emits `values` first, then the values of this stream.
+    public func prepend(_ values: T...) -> AsyncRay<T> {
+        prepend(values)
+    }
+
+    /// Pairs each value of this stream with the latest value of `other`.
+    ///
+    /// Emits only when this stream emits; values of this stream that arrive before `other` has
+    /// emitted are dropped. `other` is read concurrently, so a value it emits at the same moment
+    /// may not yet be visible. The output completes when this stream completes, cancelling
+    /// `other`; completion of `other` keeps its last value in use.
+    ///
+    /// ```swift
+    /// submitTaps.asyncRay
+    ///     .withLatestFrom(form.asyncRay)
+    ///     .sink { _, form in submit(form) }
+    /// ```
+    public func withLatestFrom<U: Sendable>(_ other: AsyncRay<U>) -> AsyncRay<(T, U)> {
+        chained { continuation, stream in
+            let latest = _LatestValueBox<U>()
+            let otherTask = Task {
+                for await value in other._make() { latest.set(value) }
+            }
+            let task = Task {
+                for await value in stream {
+                    if let otherValue = latest.get() { continuation.yield((value, otherValue)) }
+                }
+                otherTask.cancel()
+                guard !Task.isCancelled else { return }
+                continuation.finish()
+            }
+            continuation.onTermination = { @Sendable _ in
+                task.cancel()
+                otherTask.cancel()
+            }
+        }
+    }
+}
+
+private final class _LatestValueBox<U: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: U?
+
+    func set(_ newValue: U) { lock.withLock { value = newValue } }
+    func get() -> U? { lock.withLock { value } }
+}

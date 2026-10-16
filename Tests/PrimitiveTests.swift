@@ -297,11 +297,11 @@ import Testing
 
 // MARK: - Once
 
-@Test func onceResolveBeforeSubscribe() async {
+@Test func onceResolveBeforeSubscribe() async throws {
     let once = Once<String>()
     await once.resolve("done")
 
-    let value = await once.wait()
+    let value = try await once.value
     #expect(value == "done")
 }
 
@@ -338,15 +338,16 @@ import Testing
     #expect(result.values == [99])
 }
 
-@Test func onceResolvesOnlyOnce() async {
+@Test func onceResolvesOnlyOnce() async throws {
     let once = Once<Int>()
     await once.resolve(1)
     await once.resolve(2)  // Ignored
 
-    let value = await once.wait()
+    let value = try await once.value
     #expect(value == 1)
 }
 
+@available(*, deprecated, message: "Exercises deprecated compatibility overloads.")
 @Test func onceMultipleWaiters() async {
     let once = Once<String>()
     let results = Collector<String>()
@@ -421,14 +422,14 @@ import Testing
     #expect(r2.values == [777])
 }
 
-@Test func onceConcurrentResolvesPreserveFirstValue() async {
+@Test func onceConcurrentResolvesPreserveFirstValue() async throws {
     let once = Once<Int>()
     await withTaskGroup(of: Void.self) { group in
         group.addTask { await once.resolve(1) }
         group.addTask { await once.resolve(2) }
     }
 
-    let val = await once.wait()
+    let val = try await once.value
     #expect(val == 1 || val == 2)
     #expect(await once.currentValue == val)
 }

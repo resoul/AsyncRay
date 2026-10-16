@@ -16,17 +16,39 @@ extension AsyncRay {
         _ initial: Accumulator,
         _ transform: @Sendable @escaping (Accumulator, T) -> Accumulator
     ) -> AsyncRay<Accumulator> {
-        chained { continuation, stream in
-            let task = Task {
-                var current = initial
-                for await value in stream {
-                    current = transform(current, value)
-                    continuation.yield(current)
-                }
-                guard !Task.isCancelled else { return }
-                continuation.finish()
+        chainedTask { stream, continuation in
+            var current = initial
+            for await value in stream {
+                current = transform(current, value)
+                continuation.yield(current)
             }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
+        }
+    }
+
+    // MARK: - chunks
+
+    /// Groups values into arrays of `count` elements.
+    ///
+    /// When upstream completes, any remaining values are emitted as a final, shorter chunk.
+    /// Cancellation drops an incomplete chunk.
+    ///
+    /// ```swift
+    /// AsyncRay.from([1, 2, 3, 4, 5]).chunks(ofCount: 2).collect()  // [[1, 2], [3, 4], [5]]
+    /// ```
+    public func chunks(ofCount count: Int) -> AsyncRay<[T]> {
+        precondition(count > 0, "chunks(ofCount:) requires count > 0")
+        return chainedTask { stream, continuation in
+            var chunk: [T] = []
+            chunk.reserveCapacity(count)
+            for await value in stream {
+                chunk.append(value)
+                if chunk.count == count {
+                    continuation.yield(chunk)
+                    chunk.removeAll(keepingCapacity: true)
+                }
+            }
+            guard !Task.isCancelled, !chunk.isEmpty else { return }
+            continuation.yield(chunk)
         }
     }
 
@@ -46,17 +68,13 @@ extension AsyncRay {
         _ initial: Accumulator,
         _ transform: @Sendable @escaping (Accumulator, T) -> Accumulator
     ) -> AsyncRay<Accumulator> {
-        chained { continuation, stream in
-            let task = Task {
-                var current = initial
-                for await value in stream {
-                    current = transform(current, value)
-                }
-                guard !Task.isCancelled else { return }
-                continuation.yield(current)
-                continuation.finish()
+        chainedTask { stream, continuation in
+            var current = initial
+            for await value in stream {
+                current = transform(current, value)
             }
-            continuation.onTermination = { @Sendable _ in task.cancel() }
+            guard !Task.isCancelled else { return }
+            continuation.yield(current)
         }
     }
 }
